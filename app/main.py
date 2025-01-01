@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import logging
 from groq import Groq
 from app.helpers import tasks
+from app.utils.training_data import initial_context
 from fastapi.middleware.cors import CORSMiddleware
 
 # Set up the OpenAI API key
@@ -22,7 +23,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-conversation_history = []
+conversation_history = initial_context.copy()
+
+MAX_HISTORY_LENGTH = 1000
+
+def update_conversation_history(message):
+    global conversation_history
+    conversation_history.append(message)
+    if len(conversation_history) > MAX_HISTORY_LENGTH:
+        conversation_history = conversation_history[-MAX_HISTORY_LENGTH:]
 
 @app.get("/")
 async def root():
@@ -41,7 +50,7 @@ async def process_input(text_input: str):
     else:
         return {"response": "No input provided."}
 
-    conversation_history.append({"role": "user", "content": input_text})
+    update_conversation_history({"role": "user", "content": input_text})
 
     # Use Groq to process input text dynamically with history
     try:
@@ -52,7 +61,7 @@ async def process_input(text_input: str):
 
         ai_response = response.choices[0].message.content
 
-        conversation_history.append({"role": "assistant", "content": ai_response})
+        update_conversation_history({"role": "assistant", "content": ai_response})
 
         # Handle specific tasks based on keywords
         if "schedule" in ai_response and "appointment" in ai_response:
