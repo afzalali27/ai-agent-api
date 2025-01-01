@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import speech_recognition as sr
 import logging
 from groq import Groq
-from helpers import tasks
+from app.helpers import tasks
 import os
 import pyttsx3
 from fastapi.middleware.cors import CORSMiddleware
