@@ -1,0 +1,24 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Logs
+*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+
+# MacOS system files
+.DS_Store
+
+# Pytest cache
+.pytest_cache/
+
+# Environment variables
+.env
+
+# response files
+audio_responses
