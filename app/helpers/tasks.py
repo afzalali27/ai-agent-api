@@ -23,7 +23,6 @@ def default_response(ai_response: str) -> str:
 
 def weather_query_location(query):
     """Determine if the user query is related to weather, and return location"""
-    print(query)
     patterns = [
         r"what is the weather of (.+)",
         r"what is the weather in (.+)",
@@ -33,7 +32,6 @@ def weather_query_location(query):
     for pattern in patterns:
         match = re.search(pattern, query, re.IGNORECASE)
         if match:
-            print(match.group(1))
             return match.group(1)
     return None
 
