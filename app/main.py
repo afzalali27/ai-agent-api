@@ -54,22 +54,28 @@ async def process_input(text_input: str):
 
     # Use Groq to process input text dynamically with history
     try:
-        response = client.chat.completions.create(
-            model="llama3-8b-8192",
-            messages=conversation_history,  # Include history
-        )
-
-        ai_response = response.choices[0].message.content
-
-        update_conversation_history({"role": "assistant", "content": ai_response})
+        location_for_weather = tasks.weather_query_location(input_text)
+        if location_for_weather:
+            weather_data = tasks.fetch_weather(location_for_weather)
+            weather_summary = tasks.summarize_weather(weather_data)
+        else:
+            result = client.chat.completions.create(
+                model="llama3-8b-8192",
+                messages=conversation_history,
+            )
+            ai_response = result.choices[0].message.content
+            
+        response = weather_summary if location_for_weather else ai_response
+        
+        update_conversation_history({"role": "assistant", "content": response})
 
         # Handle specific tasks based on keywords
-        if "schedule" in ai_response and "appointment" in ai_response:
+        if "schedule" in response and "appointment" in response:
             return {"response": tasks.create_appointment("2024-12-30", "2:00 PM")}
-        elif "reserve" in ai_response and "restaurant" in ai_response:
+        elif "reserve" in response and "restaurant" in response:
             return {"response": tasks.make_reservation("Cafe Delight", "7:00 PM")}
         else:
-            return {"response": ai_response}
+            return {"response": response}
 
     except Exception as e:
         return {"response": None, "error": f"Error processing input: {str(e)}"}
