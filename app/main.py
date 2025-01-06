@@ -1,11 +1,12 @@
 from config import Config
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 import logging
 from groq import Groq
 from app.helpers import tasks
 from app.utils.training_data import initial_context
 from fastapi.middleware.cors import CORSMiddleware
+from uuid import uuid4
 
 # Set up the OpenAI API key
 client = Groq(api_key=Config.GROQ_API_KEY)
@@ -23,15 +24,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-conversation_history = initial_context.copy()
+conversation_histories = {}
 
 MAX_HISTORY_LENGTH = 1000
+GLOBAL_SESSION = '_global_key'
 
-def update_conversation_history(message):
-    global conversation_history
-    conversation_history.append(message)
-    if len(conversation_history) > MAX_HISTORY_LENGTH:
-        conversation_history = conversation_history[-MAX_HISTORY_LENGTH:]
+def get_user_conversation(session_id: str):
+    if session_id not in conversation_histories:
+        conversation_histories[session_id] = initial_context.copy()
+    return conversation_histories[session_id]
+
+def update_user_conversation(session_id: str, message: dict):
+    if session_id not in conversation_histories:
+        conversation_histories[session_id] = initial_context.copy()
+    conversation_histories[session_id].append(message)
+    if len(conversation_histories[session_id]) > MAX_HISTORY_LENGTH:
+        conversation_histories[session_id] = conversation_histories[session_id][-MAX_HISTORY_LENGTH:]
+
 
 @app.get("/")
 async def root():
@@ -42,15 +51,15 @@ class UserInput(BaseModel):
     text: str
 
 @app.post("/process-input/")
-async def process_input(text_input: str):
-    global conversation_history
+async def process_input(request: Request, text_input: str):
+    session_id = request.headers.get("X-Session-ID", GLOBAL_SESSION)
 
     if text_input:
         input_text = text_input.lower()
     else:
         return {"response": "No input provided."}
 
-    update_conversation_history({"role": "user", "content": input_text})
+    update_user_conversation(session_id, {"role": "user", "content": input_text})
 
     # Use Groq to process input text dynamically with history
     try:
@@ -61,13 +70,13 @@ async def process_input(text_input: str):
         else:
             result = client.chat.completions.create(
                 model="llama3-8b-8192",
-                messages=conversation_history,
+                messages=get_user_conversation(session_id),
             )
             ai_response = result.choices[0].message.content
             
         response = weather_summary if location_for_weather else ai_response
         
-        update_conversation_history({"role": "assistant", "content": response})
+        update_user_conversation(session_id, {"role": "assistant", "content": response})
 
         # Handle specific tasks based on keywords
         if "schedule" in response and "appointment" in response:
